@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "sta-forcemap: interactive solvent-tip-approximation force maps from MD trajectories"
+authors:
+  - family-names: Alesafar
+    given-names: Azin
+    email: azin.alesafar@gmail.com
+version: 0.1.0
+date-released: 2026-09-11
+license: MIT
+repository-code: "https://github.com/azinalesafar/sta-forcemap"

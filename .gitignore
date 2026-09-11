@@ -1,0 +1,26 @@
+# outputs (an HTML map can exceed GitHub's 100 MB file limit)
+*.html
+*.npz
+*.png
+!docs/*.png
+
+# trajectories, except the bundled example
+*.traj
+!examples/water_on_adsorbate.traj
+*.xyz
+*.extxyz
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+
+# editors
+.vscode/
+.idea/
+.claude/
