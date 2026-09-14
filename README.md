@@ -5,17 +5,17 @@ molecular-dynamics trajectories.
 
 Given an MD trajectory of water (or another liquid) on a surface, `sta-forcemap` measures the
 probe-molecule density relative to the local surface height and converts it to the force a
-probe would feel,
+probe would feel.
 
 $$F(x, y, z) = k_\mathrm{B}T \, \frac{\partial \ln \rho(x, y, z)}{\partial z},$$
 
 the quantity usually compared with 3D-AFM / force-spectroscopy measurements of hydration
-layers. The result is a single self-contained HTML page:
+layers. The result is an HTML page:
 
 * **left:** the laterally averaged force profile $F(z)$;
 * **right:** the lateral force map $F(x, y)$ in true Cartesian geometry (oblique cells
   handled correctly), with the surface structure drawn on top as ball-and-stick;
-* a **slider** to move the map through $z$.
+* a **slider** to move the map through different heights $z$.
 
 <!-- TODO: add a screenshot, e.g. docs/screenshot.png -->
 
@@ -55,7 +55,7 @@ use `--format` if the format can't be guessed from the extension).
   ignored.
 * The surface atoms don't change identity during the run. They can be fixed or mobile: their
   positions are read in every frame.
-* The trajectory is **equilibrated**. Skip equilibration with `--start`.
+* Use `--start N` to discard the first N frames while the system is equilibrating.
 
 ### Choosing atoms
 
