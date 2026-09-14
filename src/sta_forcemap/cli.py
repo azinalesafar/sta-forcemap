@@ -48,6 +48,18 @@ def build_parser():
     g.add_argument("--cutoff", type=float, default=d.cutoff,
                    help="lateral radius (Å) for the local surface height")
 
+    g = p.add_argument_group(
+        "height reference",
+        "What probe heights are measured from. 'local': the highest surface atom within "
+        "--cutoff of each probe, following a bumpy surface (e.g. non-planar adsorbates). "
+        "'plane': the mean z of the surface atoms in each frame (bare substrates, planar "
+        "adsorbates, constant-height AFM comparisons). 'fixed': the plane z = --reference-z.")
+    # SUPPRESS keeps argparse from printing a misleading "(default: None)"
+    g.add_argument("--reference", choices=["local", "plane", "fixed"], default=argparse.SUPPRESS,
+                   help="height reference (default: local, or fixed if --reference-z is given)")
+    g.add_argument("--reference-z", type=float, default=argparse.SUPPRESS, metavar="Z",
+                   help="z (Å) of the reference plane; implies --reference fixed")
+
     g = p.add_argument_group("density grid")
     g.add_argument("--z-max", type=float, default=d.z_max,
                    help="max height above the surface (Å); keep below any "
@@ -61,6 +73,9 @@ def build_parser():
                    help="z Gaussian smoothing sigma (bins, 0 = off)")
     g.add_argument("--bulk-window", type=float, nargs=2, default=None, metavar=("LO", "HI"),
                    help="z range (Å) over which to report the bulk density")
+    g.add_argument("--min-counts", type=int, default=d.min_counts,
+                   help="height bins with fewer raw probe counts (summed over all frames) "
+                        "are left blank instead of showing a spurious force")
 
     g = p.add_argument_group("map")
     g.add_argument("--half-width", type=float, default=d.half_width,
@@ -100,15 +115,29 @@ def build_parser():
     return p
 
 
+def resolve_reference(a):
+    reference = getattr(a, "reference", None)
+    if getattr(a, "reference_z", None) is not None:
+        if reference not in (None, "fixed"):
+            raise ValueError(f"--reference-z cannot be combined with --reference {reference}")
+        return "fixed"
+    if reference == "fixed":
+        raise ValueError("--reference fixed needs --reference-z")
+    return reference or "local"
+
+
 def settings_from_args(a):
     return Settings(
         temperature=a.temperature,
         surface=a.surface, surface_zmin=a.surface_zmin, surface_zmax=a.surface_zmax,
-        probe=a.probe, cutoff=a.cutoff,
+        probe=a.probe, reference=resolve_reference(a),
+        reference_z=getattr(a, "reference_z", None),
+        cutoff=a.cutoff,
         start=a.start, stop=a.stop, stride=a.stride, format=a.format,
         lateral_bins=a.lateral_bins, dz=a.dz, z_max=a.z_max,
         lateral_smooth=a.lateral_smooth, z_smooth=a.z_smooth,
         bulk_window=tuple(a.bulk_window) if a.bulk_window else None,
+        min_counts=a.min_counts,
         half_width=a.half_width, z_default=a.z_default, z_step=a.z_step,
         patch_size=a.patch_size, pixels=a.pixels,
         center=tuple(a.center) if a.center else None,
@@ -123,7 +152,8 @@ def save_npz(result, path):
     np.savez(path, z=result.z_mid, rho=result.rho1d, force_profile=result.f1d,
              force_field=result.f3d.astype(np.float32), cell_xy=result.cell2d,
              temperature=s.temperature, kT=s.kT, n_frames=result.histogram.n_frames,
-             lateral_bins=s.lateral_bins, dz=result.histogram.dz)
+             lateral_bins=s.lateral_bins, dz=result.histogram.dz, reference=s.reference,
+             reference_z=np.nan if s.reference_z is None else s.reference_z)
 
 
 def main(argv=None):
@@ -132,7 +162,8 @@ def main(argv=None):
         sys.exit("error: --temperature must be positive")
     out = a.output or os.path.splitext(a.trajectory)[0] + "_forcemap.html"
     try:
-        result = compute_force_map(a.trajectory, settings_from_args(a), verbose=not a.quiet)
+        settings = settings_from_args(a)
+        result = compute_force_map(a.trajectory, settings, verbose=not a.quiet)
     except (ValueError, FileNotFoundError) as e:
         sys.exit(f"error: {e}")
     if a.save_npz:

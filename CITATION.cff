@@ -5,7 +5,7 @@ authors:
   - family-names: Alesafar
     given-names: Azin
     email: azin.alesafar@gmail.com
-version: 0.1.0
-date-released: 2026-09-11
+version: 0.2.0
+date-released: 2026-09-14
 license: MIT
 repository-code: "https://github.com/azinalesafar/sta-forcemap"

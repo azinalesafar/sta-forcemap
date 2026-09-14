@@ -74,9 +74,22 @@ adsorbate lying on a fixed substrate is selected with `--surface fixed --surface
 Surface atoms are always removed from the probe selection. If the substrate itself contains
 oxygen, select the water oxygens by index instead.
 
-For each probe atom, the local surface height is the *z* of the highest surface atom within
-`--cutoff` Å laterally (default 2.5 Å). If no surface atom is that close, the laterally
-nearest one is used.
+### Height reference
+
+`--reference` chooses what heights are measured from:
+
+| reference | height measured from | use for |
+|---|---|---|
+| `local` (default) | the highest surface atom within `--cutoff` Å (default 2.5 Å) laterally of each probe; the nearest surface atom if none is that close | bumpy, non-planar adsorbates |
+| `plane` | the mean *z* of the surface atoms, recomputed every frame | bare substrates (select the top layer), planar adsorbates, constant-height AFM comparisons |
+| `fixed` | a plane you give with `--reference-z Z` | a common zero for several systems on the same substrate |
+
+```bash
+sta-forcemap md.traj -T 300 --surface 0-63 --reference plane       # bare substrate, top layer = atoms 0-63
+sta-forcemap md.traj -T 300 --reference-z 12.0                     # heights above z = 12 Å
+```
+
+See [docs/method.md](docs/method.md#2-height-reference) for details.
 
 ### Main options
 
@@ -84,9 +97,11 @@ nearest one is used.
 |---|---|---|
 | `-T/--temperature` | required | temperature in K; sets $k_\mathrm{B}T$ |
 | `--start/--stop/--stride` | `0/end/1` | which frames to use |
+| `--reference`, `--reference-z` | `local` | what heights are measured from (see above) |
 | `--z-max` | 20 Å | maximum height; keep it below any liquid–vapour interface |
 | `--dz`, `--lateral-bins` | 0.3 Å, 100 | density grid resolution |
 | `--lateral-smooth`, `--z-smooth` | 1.0, 1.5 bins | Gaussian smoothing (0 = off) |
+| `--min-counts` | 50 | heights with fewer probe counts are left blank |
 | `--half-width` | 1.0 Å | half-thickness of the slab averaged for each map |
 | `--z-default` | first density peak | initial slice; also sets the colour range |
 | `--clim-percentiles` / `--clim` | 0.2 99.8 | colour range (fixed for all slices) |

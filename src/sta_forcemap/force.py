@@ -37,13 +37,22 @@ def force_profile(rho1d, dz, kT):
     return kT * np.gradient(np.log(np.clip(rho1d, _EPS_RHO, None)), dz)
 
 
-def slab_average(f3d, z_mid, z0, half_width):
+def slab_average(f3d, z_mid, z0, half_width, valid=None):
     """Mean of f3d over the z-bins with centres in [z0 - hw, z0 + hw); the
-    nearest bin if the window contains none."""
+    nearest bin if the window contains none.
+
+    `valid` (bool per z-bin) excludes unsampled bins; if no valid bin is left,
+    the result is all NaN.
+    """
     mask = (z_mid >= z0 - half_width) & (z_mid < z0 + half_width)
-    if not mask.any():
-        return f3d[int(np.argmin(np.abs(z_mid - z0)))]
-    return f3d[mask].mean(axis=0)
+    if valid is not None:
+        mask &= valid
+    if mask.any():
+        return f3d[mask].mean(axis=0)
+    nearest = int(np.argmin(np.abs(z_mid - z0)))
+    if valid is None or valid[nearest]:
+        return f3d[nearest]
+    return np.full(f3d.shape[1:], np.nan)
 
 
 class CartesianSampler:

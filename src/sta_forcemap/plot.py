@@ -12,6 +12,8 @@ from ase.data import atomic_numbers, covalent_radii
 from ase.data.colors import jmol_colors
 from plotly.subplots import make_subplots
 
+from .pipeline import height_axis_label
+
 FONT_FAMILY = "Georgia, 'Times New Roman', Times, serif"
 FONT_SIZE = 15
 AXIS_TITLE_FONT_SIZE = 18
@@ -143,7 +145,7 @@ def build_figure(result, title="lateral STA force", cmap="afmhot"):
     fig.add_hline(y=0.0, line=dict(color="gray", width=0.8), row=1, col=1)
     fig.add_vline(x=result.z_default, line=dict(color="crimson", dash="dash", width=0.8),
                   row=1, col=1)
-    fig.update_xaxes(title_text="Height above local surface (Å)", range=[0, s.z_max],
+    fig.update_xaxes(title_text=height_axis_label(s), range=[0, s.z_max],
                      row=1, col=1)
     fig.update_yaxes(title_text="<i>F(z)</i>  (eV/Å)", range=[-f_lim, f_lim], row=1, col=1)
 

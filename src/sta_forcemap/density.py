@@ -6,12 +6,16 @@ from dataclasses import dataclass
 import numpy as np
 
 
-def local_surface_height(probe_xy, surf_xy, surf_z, cell2d, cutoff):
+REFERENCES = ("local", "plane", "fixed")
+
+
+def local_surface_height(probe_xy, surf_xy, surf_z, cell2d, cutoff, return_fallback=False):
     """Local surface height under each probe atom.
 
     For each probe, the highest surface atom within `cutoff` (lateral,
     minimum-image) distance; if none is that close, the z of the laterally
-    nearest surface atom.
+    nearest surface atom. With return_fallback=True, also returns a boolean
+    mask of the probes that needed that fallback.
     """
     inv_cell = np.linalg.inv(cell2d.T)
     diff = probe_xy[:, None, :] - surf_xy[None, :, :]
@@ -23,6 +27,8 @@ def local_surface_height(probe_xy, surf_xy, surf_z, cell2d, cutoff):
     missing = ~np.isfinite(surf_height)
     if missing.any():
         surf_height[missing] = surf_z[dist[missing].argmin(axis=1)]
+    if return_fallback:
+        return surf_height, missing
     return surf_height
 
 
@@ -35,6 +41,13 @@ class DensityHistogram:
     z_edges: np.ndarray       # (n_z + 1,) in Å
     n_frames: int
     mean_area: float          # mean lateral cell area over the frames, Å^2
+    reference: str = "local"
+    n_counted: int = 0        # probe samples that landed in the histogram
+    n_fallback: int = 0       # of those, local mode only: no surface atom within cutoff
+
+    @property
+    def fallback_fraction(self):
+        return self.n_fallback / self.n_counted if self.n_counted else 0.0
 
     @property
     def dz(self):
@@ -65,12 +78,24 @@ def check_cell(cell):
 
 
 def accumulate_density(frames, surface_idx, probe_idx, *, cutoff=2.5, dz=0.3,
-                       z_max=20.0, lateral_bins=100, progress_every=0):
+                       z_max=20.0, lateral_bins=100, reference="local",
+                       reference_z=None, progress_every=0):
     """Histogram probe atoms over an iterable of ase.Atoms frames.
 
-    Probe heights are measured from the local surface height (see
-    local_surface_height); probes below the surface or above z_max are ignored.
+    Probe heights h = z_probe - z_ref, where z_ref is set by `reference`:
+
+    * "local": the local surface height under each probe (see
+      local_surface_height) -- follows a bumpy surface atom by atom;
+    * "plane": the mean z of the surface atoms, recomputed every frame -- a
+      flat reference that also follows a drifting slab;
+    * "fixed": the constant `reference_z` (Å).
+
+    Probes with h < 0 or h >= z_max are ignored.
     """
+    if reference not in REFERENCES:
+        raise ValueError(f"reference must be one of {REFERENCES}, got {reference!r}")
+    if (reference == "fixed") != (reference_z is not None):
+        raise ValueError("reference_z must be given exactly when reference='fixed'")
     surface_idx = np.asarray(surface_idx)
     probe_idx = np.asarray(probe_idx)
     nb = int(lateral_bins)
@@ -80,24 +105,35 @@ def accumulate_density(frames, surface_idx, probe_idx, *, cutoff=2.5, dz=0.3,
     counts = np.zeros((n_zbins, nb, nb))
     area_acc = 0.0
     n_frames = 0
+    n_counted = 0
+    n_fallback = 0
 
     for atoms in frames:
         if n_frames == 0:
             check_cell(atoms.cell)
         cell2d = atoms.cell[:2, :2]
-        surf_xy = atoms.positions[surface_idx, :2]
-        surf_z = atoms.positions[surface_idx, 2]
 
         probe_pos = atoms.positions[probe_idx]
         probe_xy = probe_pos[:, :2]
-        height = probe_pos[:, 2] - local_surface_height(probe_xy, surf_xy, surf_z,
-                                                        cell2d, cutoff)
+        fallback = None
+        if reference == "local":
+            z_ref, fallback = local_surface_height(
+                probe_xy, atoms.positions[surface_idx, :2], atoms.positions[surface_idx, 2],
+                cell2d, cutoff, return_fallback=True)
+        elif reference == "plane":
+            z_ref = atoms.positions[surface_idx, 2].mean()
+        else:
+            z_ref = reference_z
+        height = probe_pos[:, 2] - z_ref
 
         inv_cell2d = np.linalg.inv(cell2d.T)
         frac = np.mod(probe_xy @ inv_cell2d.T, 1.0)
 
         zi = np.floor(height / dz).astype(int)
         valid = (zi >= 0) & (zi < n_zbins)
+        n_counted += int(valid.sum())
+        if fallback is not None:
+            n_fallback += int((valid & fallback).sum())
         if valid.any():
             ai = np.clip((frac[valid, 0] * nb).astype(int), 0, nb - 1)
             bi = np.clip((frac[valid, 1] * nb).astype(int), 0, nb - 1)
@@ -111,4 +147,5 @@ def accumulate_density(frames, surface_idx, probe_idx, *, cutoff=2.5, dz=0.3,
     if n_frames == 0:
         raise ValueError("no frames to analyse (check --start/--stop/--stride)")
     return DensityHistogram(counts=counts, z_edges=z_edges, n_frames=n_frames,
-                            mean_area=area_acc / n_frames)
+                            mean_area=area_acc / n_frames, reference=reference,
+                            n_counted=n_counted, n_fallback=n_fallback)

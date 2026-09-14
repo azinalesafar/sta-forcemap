@@ -7,7 +7,7 @@ The STA force on a probe molecule at height z above a surface is
 where rho is the probe (e.g. water-oxygen) number density measured relative
 to the local surface height. See docs/method.md for details.
 """
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .density import DensityHistogram, accumulate_density, local_surface_height
 from .force import (
