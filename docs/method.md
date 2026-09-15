@@ -121,7 +121,7 @@ The overlay is drawn from the surface atoms of the first frame, or from `--overl
 cutoffs × `bond_mult`. Each bonded fragment is made whole across the periodic boundary
 before drawing.
 
-## 7. Caveats
+## 7. Limitations
 
 * The STA treats the tip as a single solvent molecule. It ignores the tip's own structure and
   its perturbation of the liquid.
